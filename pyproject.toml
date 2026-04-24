@@ -1,0 +1,8 @@
+[project]
+name = "air-pollutant-solution-optimization"
+version = "0.1.0"
+description = "AQI prediction and intervention optimization project"
+requires-python = ">=3.10"
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "backend/tests"]

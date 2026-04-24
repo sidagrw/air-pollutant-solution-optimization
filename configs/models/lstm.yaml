@@ -1,0 +1,5 @@
+model_name: lstm
+sequence_length: 7
+epochs: 50
+batch_size: 32
+target: aqi

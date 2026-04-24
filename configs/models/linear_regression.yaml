@@ -1,0 +1,10 @@
+model_name: linear_regression
+target: aqi
+features:
+  - pm25
+  - pm10
+  - no2
+  - temperature
+  - humidity
+  - traffic_index
+  - green_cover_percent
