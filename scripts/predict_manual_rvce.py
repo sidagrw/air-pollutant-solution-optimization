@@ -28,6 +28,12 @@ defaults = train_df[numeric_columns].median(numeric_only=True)
 
 pm25 = float(input("Enter PM2.5 value: "))
 no2 = float(input("Enter NO2 value: "))
+temperature = float(input("Enter temperature, AT °C: "))
+humidity = float(input("Enter relative humidity, RH %: "))
+wind_speed = float(input("Enter wind speed, WS m/s: "))
+hour = int(input("Enter hour, 0-23: "))
+month = int(input("Enter month, 1-12: "))
+day_of_week = int(input("Enter day of week, Monday=0, Sunday=6: "))
 
 sample = {
     "PM2.5 (µg/m³)": pm25,
@@ -36,13 +42,13 @@ sample = {
     "SO2 (µg/m³)": defaults["SO2 (µg/m³)"],
     "CO (mg/m³)": defaults["CO (mg/m³)"],
     "Ozone (µg/m³)": defaults["Ozone (µg/m³)"],
-    "AT (°C)": defaults["AT (°C)"],
-    "RH (%)": defaults["RH (%)"],
-    "WS (m/s)": defaults["WS (m/s)"],
+    "AT (°C)": temperature,
+    "RH (%)": humidity,
+    "WS (m/s)": wind_speed,
     "RF (mm)": defaults["RF (mm)"],
-    "hour": 12,
-    "month": 1,
-    "day_of_week": 0,
+    "hour": hour,
+    "month": month,
+    "day_of_week": day_of_week,
 }
 
 X = pd.DataFrame([sample])
@@ -54,9 +60,9 @@ print(f"Predicted next AQI proxy: {prediction:.2f}")
 if prediction <= 50:
     category = "Good"
 elif prediction <= 100:
-    category = "Satisfactory/Moderate"
+    category = "Satisfactory"
 elif prediction <= 200:
-    category = "Moderate/Poor"
+    category = "Moderate"
 elif prediction <= 300:
     category = "Poor"
 elif prediction <= 400:
