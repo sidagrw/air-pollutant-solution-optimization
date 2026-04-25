@@ -33,3 +33,4 @@ build/
 # IDE
 .vscode/
 .idea/
+models/trained/*.pkl
