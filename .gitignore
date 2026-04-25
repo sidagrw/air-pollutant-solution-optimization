@@ -34,3 +34,4 @@ build/
 .vscode/
 .idea/
 models/trained/*.pkl
+models/trained/*.pkl
