@@ -1,0 +1,4 @@
+date,location,pm25,pm10,no2,temperature,humidity,traffic_index,green_cover_percent,aqi
+2026-03-01,Bengaluru_Zone_A,42,78,31,29,55,0.72,12,94
+2026-03-02,Bengaluru_Zone_A,46,82,34,30,53,0.75,12,101
+2026-03-03,Bengaluru_Zone_B,35,68,27,28,60,0.54,20,82

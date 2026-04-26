@@ -1,0 +1,15 @@
+interventions:
+  increase_green_cover:
+    description: Increase green-cover percentage in selected area
+    effect_feature: green_cover_percent
+
+  reduce_traffic:
+    description: Reduce traffic intensity through mobility restrictions
+    effect_feature: traffic_index
+
+  industrial_control:
+    description: Reduce industrial pollutant contribution
+    affected_pollutants:
+      - pm25
+      - pm10
+      - no2

@@ -1,0 +1,6 @@
+raw_data_path: data/raw
+processed_data_path: data/processed
+sample_data_path: data/sample/sample_aqi_data.csv
+target_column: aqi
+date_column: date
+location_column: location

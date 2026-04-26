@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+.env
+.env.local
+
+# Data and model artifacts
+data/raw/*
+data/processed/*
+data/simulated/*
+models/trained/*
+models/checkpoints/*
+outputs/*
+!data/**/.gitkeep
+!models/**/.gitkeep
+!outputs/**/.gitkeep
+
+# Node / React
+node_modules/
+dist/
+build/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+models/trained/*.pkl
+models/trained/*.pkl

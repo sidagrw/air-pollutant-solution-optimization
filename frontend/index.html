@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>AirOpt | Pollution Intelligence</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&display=swap');
+        body { background-color: #050505; color: #a1a1aa; font-family: 'JetBrains Mono', monospace; margin: 0; overflow: hidden; }
+        .glass-panel { background: #0f1115; border: 1px solid #1f2937; }
+        .sidebar-active { background: #10b98112; color: #10b981; border-left: 3px solid #10b981; }
+        input[type=range] { accent-color: #10b981; }
+        .neon-glow { box-shadow: 0 0 20px rgba(16, 185, 129, 0.05); }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: #050505; }
+        ::-webkit-scrollbar-thumb { background: #1f2937; border-radius: 10px; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+        const API = "http://127.0.0.1:8000";
+
+        function App() {
+            const [tab, setTab] = useState('dashboard');
+            const [data, setData] = useState(null);
+
+            useEffect(() => {
+                const fetchSync = () => {
+                    fetch(`${API}/predictions/aqi`)
+                        .then(res => res.json())
+                        .then(setData)
+                        .catch(err => console.error("Data Sync Error:", err));
+                };
+                fetchSync();
+                const interval = setInterval(fetchSync, 60000); 
+                return () => clearInterval(interval);
+            }, []);
+
+            useEffect(() => { if (window.lucide) window.lucide.createIcons(); });
+
+            if (!data) return (
+                <div className="h-screen flex items-center justify-center bg-black">
+                    <div className="text-emerald-500 font-bold animate-pulse tracking-[0.5em] uppercase">Initializing_Nodal_Handshake...</div>
+                </div>
+            );
+
+            return (
+                <div className="flex h-screen w-full">
+                    {/* Sidebar */}
+                    <aside className="w-64 bg-black border-r border-zinc-900 flex flex-col shrink-0 p-8">
+                        <div className="mb-12">
+                            <div className="text-2xl font-black text-emerald-500 tracking-tighter italic">AirOpt</div>
+                        </div>
+                        <nav className="flex-1 space-y-2">
+                            <button onClick={() => setTab('dashboard')} className={`w-full flex items-center gap-4 px-4 py-3 rounded text-[11px] font-bold tracking-widest transition-all ${tab==='dashboard'?'sidebar-active':'text-zinc-600 hover:text-zinc-400'}`}>
+                                <i data-lucide="layout-dashboard" className="w-4 h-4"></i> DASHBOARD
+                            </button>
+                            <button onClick={() => setTab('cstr')} className={`w-full flex items-center gap-4 px-4 py-3 rounded text-[11px] font-bold tracking-widest transition-all ${tab==='cstr'?'sidebar-active':'text-zinc-600 hover:text-zinc-400'}`}>
+                                <i data-lucide="flask-conical" className="w-4 h-4"></i> CSTR MITIGATOR
+                            </button>
+                        </nav>
+                        <div className="text-[9px] text-zinc-800 font-bold border-t border-zinc-900 pt-6 uppercase tracking-widest">
+                            Station: {data.live.station || 'Bengaluru_Node'}
+                        </div>
+                    </aside>
+
+                    <main className="flex-1 bg-[#050506] overflow-y-auto p-10">
+                        <header className="flex justify-between items-center mb-10">
+                            <h1 className="text-xl font-bold text-zinc-200 uppercase tracking-widest italic">/{tab}</h1>
+                            <div className="text-[10px] text-zinc-500 bg-zinc-900 border border-zinc-800 px-4 py-2 rounded uppercase font-bold tracking-widest">
+                                {new Date().toLocaleTimeString()}
+                            </div>
+                        </header>
+
+                        {tab === 'dashboard' ? (
+                            <DashboardView data={data} />
+                        ) : (
+                            <CSTRPanel liveData={data.live} />
+                        )}
+                    </main>
+                </div>
+            );
+        }
+
+        function DashboardView({ data }) {
+            const chartRef = useRef(null);
+
+            useEffect(() => {
+                const ctx = document.getElementById('forecastChart');
+                if (ctx && data.forecast) {
+                    if (chartRef.current) chartRef.current.destroy();
+
+                    chartRef.current = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: data.forecast.map(f => f.time),
+                            datasets: [{
+                                label: 'Predicted AQI',
+                                data: data.forecast.map(f => f.aqi),
+                                borderColor: '#10b981',
+                                backgroundColor: 'rgba(16, 185, 129, 0.03)',
+                                fill: true, tension: 0.4, pointRadius: 0, borderWidth: 2
+                            }]
+                        },
+                        options: {
+                            responsive: true, maintainAspectRatio: false,
+                            plugins: { legend: { display: false } },
+                            scales: {
+                                y: { grid: { color: '#111' }, ticks: { color: '#333', font: { size: 9 } } },
+                                x: { grid: { display: false }, ticks: { color: '#333', font: { size: 9 } } }
+                            }
+                        }
+                    });
+                }
+                return () => { if (chartRef.current) chartRef.current.destroy(); };
+            }, [data]);
+
+            return (
+                <div className="space-y-8 max-w-6xl">
+                    <div className="glass-panel p-10 rounded-2xl flex items-center gap-12 border-l-4 border-emerald-500 neon-glow">
+                        <div className="w-32 h-32 rounded-full border-2 border-emerald-500 flex flex-col items-center justify-center">
+                            <span className="text-4xl font-black text-zinc-100">{data.live.aqi}</span>
+                            <span className="text-[10px] text-zinc-500 font-bold uppercase">AQI</span>
+                        </div>
+                        <div>
+                            <div className="text-emerald-500 font-black text-3xl mb-2 italic uppercase tracking-tighter">
+                                {data.live.aqi < 50 ? 'GOOD' : data.live.aqi < 100 ? 'SATISFACTORY' : 'MODERATE'}
+                            </div>
+                            <p className="text-xs text-zinc-500 leading-relaxed max-w-lg uppercase">
+                                Telemetry status: {data.live.status}. Monitoring atmospheric loading.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-4 gap-6">
+                        <MetricCard label="PM2.5" val={data.live.pm25} unit="µg/m³" icon="wind" />
+                        <MetricCard label="PM10" val={data.live.pm10} unit="µg/m³" icon="layers" />
+                        <MetricCard label="NO2" val={data.live.no2} unit="ppb" icon="zap" />
+                        <MetricCard label="TEMP" val={data.live.temp} unit="°C" icon="thermometer" />
+                    </div>
+
+                    <div className="glass-panel p-8 rounded-xl h-80">
+                        <h3 className="text-[10px] text-zinc-600 font-bold uppercase tracking-[0.3em] mb-6 italic">/24H_Predictive_Trend (Random_Forest_Engine)</h3>
+                        <div className="h-full pb-8"><canvas id="forecastChart"></canvas></div>
+                    </div>
+                </div>
+            );
+        }
+
+        function MetricCard({ label, val, unit, icon }) {
+            return (
+                <div className="glass-panel p-6 rounded-xl hover:border-emerald-500 transition-all group">
+                    <div className="flex justify-between items-start mb-4">
+                        <div className="text-[9px] text-zinc-600 tracking-widest uppercase font-bold">{label}</div>
+                        <i data-lucide={icon} className="w-3 h-3 text-zinc-800 group-hover:text-emerald-500 transition-colors"></i>
+                    </div>
+                    <div className="text-3xl font-bold text-zinc-100 mb-1">{val}</div>
+                    <div className="text-[9px] text-zinc-700 uppercase font-black tracking-widest">{unit}</div>
+                </div>
+            );
+        }
+
+        function CSTRPanel({ liveData }) {
+            const [params, setParams] = useState({ inj_rate: 0.1, sim_mins: 15 });
+            const [results, setResults] = useState(null);
+            const [loading, setLoading] = useState(false);
+            const chartRef = useRef(null);
+
+            const handleIgnition = async () => {
+                setLoading(true);
+                try {
+                    const response = await fetch(`${API}/simulations/cstr`, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ 
+                            ...params, 
+                            spray_type: 1, 
+                            initial_no2: parseFloat(liveData.no2) || 25, 
+                            initial_pm25: parseFloat(liveData.pm25) || 80, 
+                            initial_pm10: parseFloat(liveData.pm10) || 120, 
+                            wind_speed: 3.5 
+                        })
+                    });
+                    setResults(await response.json());
+                } catch (err) {
+                    console.error("Simulation Error:", err);
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            // Initialize Dual-Axis Chart when results arrive
+            useEffect(() => {
+                const ctx = document.getElementById('decayChart');
+                if (ctx && results && results.timeline) {
+                    if (chartRef.current) chartRef.current.destroy();
+                    
+                    chartRef.current = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: results.timeline.map(t => `T+${t.minute}`),
+                            datasets: [
+                                {
+                                    label: 'Overall AQI',
+                                    data: results.timeline.map(t => t.aqi),
+                                    borderColor: '#10b981', 
+                                    backgroundColor: 'rgba(16, 185, 129, 0.05)',
+                                    fill: true, tension: 0.4, yAxisID: 'y'
+                                },
+                                {
+                                    label: 'NO₂ (ppb)',
+                                    data: results.timeline.map(t => t.no2),
+                                    borderColor: '#0ea5e9', 
+                                    borderDash: [5, 5],
+                                    backgroundColor: 'transparent',
+                                    fill: false, tension: 0.4, yAxisID: 'y1'
+                                }
+                            ]
+                        },
+                        options: {
+                            responsive: true, maintainAspectRatio: false,
+                            plugins: { legend: { labels: { color: '#a1a1aa', font: { size: 10, family: 'JetBrains Mono' } } } },
+                            scales: {
+                                y: {
+                                    type: 'linear', position: 'left',
+                                    title: { display: true, text: 'Air Quality Index (AQI)', color: '#10b981', font: { size: 10 } },
+                                    grid: { color: '#1f2937' }, ticks: { color: '#a1a1aa', font: { size: 9 } }
+                                },
+                                y1: {
+                                    type: 'linear', position: 'right',
+                                    title: { display: true, text: 'NO₂ (ppb)', color: '#0ea5e9', font: { size: 10 } },
+                                    grid: { drawOnChartArea: false }, ticks: { color: '#a1a1aa', font: { size: 9 } }
+                                },
+                                x: { grid: { display: false }, ticks: { color: '#a1a1aa', font: { size: 9 }, maxTicksLimit: 10 } }
+                            }
+                        }
+                    });
+                }
+                return () => { if (chartRef.current) chartRef.current.destroy(); };
+            }, [results]);
+
+            return (
+                <div className="grid grid-cols-12 gap-8 max-w-7xl">
+                    <div className="col-span-4 glass-panel p-8 rounded-2xl h-fit space-y-10">
+                        <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-widest border-b border-zinc-900 pb-4 italic">/Reactor_Config</h3>
+                        <div className="space-y-8">
+                            <div>
+                                <div className="flex justify-between text-[10px] text-zinc-500 mb-3 uppercase"><span>Injection Rate</span><span className="text-emerald-500 font-bold">{params.inj_rate} kg/s</span></div>
+                                <input type="range" min="0.01" max="0.2" step="0.01" className="w-full" value={params.inj_rate} onChange={e=>setParams({...params, inj_rate: parseFloat(e.target.value)})} />
+                            </div>
+                            <div>
+                                <div className="flex justify-between text-[10px] text-zinc-500 mb-3 uppercase"><span>Operation Time</span><span className="text-emerald-500 font-bold">{params.sim_mins} Min</span></div>
+                                <input type="range" min="5" max="30" className="w-full" value={params.sim_mins} onChange={e=>setParams({...params, sim_mins: parseInt(e.target.value)})} />
+                            </div>
+                            <button onClick={handleIgnition} className="w-full bg-emerald-600 text-white font-black py-4 rounded uppercase text-xs tracking-[0.3em] hover:bg-emerald-500 transition-all shadow-lg shadow-emerald-500/10">
+                                {loading ? 'CALCULATING_DECAY...' : 'INITIATE_SIMULATION'}
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="col-span-8 glass-panel p-8 rounded-2xl min-h-[550px] flex flex-col relative overflow-hidden">
+                        <h3 className="text-[10px] text-zinc-500 font-bold uppercase mb-8 border-b border-zinc-900 pb-4 tracking-widest italic">/Mitigation_Output</h3>
+                        {results ? (
+                            <div className="flex-1 flex flex-col">
+                                <div className="grid grid-cols-2 gap-4 mb-8">
+                                    <div className="bg-black/50 border border-zinc-800 p-6 rounded-xl relative">
+                                        <div className="text-[9px] text-zinc-600 uppercase font-bold mb-1 tracking-widest">Initial AQI</div>
+                                        <div className="text-2xl font-bold text-zinc-400 mb-3">{results.initial_aqi}</div>
+                                        <div className="text-[9px] text-zinc-600 uppercase font-bold mb-1 tracking-widest">Projected AQI</div>
+                                        <div className="text-4xl font-black text-emerald-500 tracking-tighter underline decoration-emerald-500/20">{results.final_aqi}</div>
+                                    </div>
+                                    <div className="bg-black/50 border border-zinc-800 p-6 rounded-xl flex flex-col justify-center relative">
+                                        {/* PERCENTAGE DROP BADGE */}
+                                        <div className="absolute top-4 right-4 bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 text-[10px] px-2 py-1 rounded font-bold tracking-widest">
+                                            -{results.no2_reduction_pct}%
+                                        </div>
+                                        <div className="text-[9px] text-zinc-600 uppercase font-bold mb-1 tracking-widest">NO₂ Concentration Decay</div>
+                                        <div className="text-xl font-bold text-zinc-400">{results.initial_no2} ppb</div>
+                                        <div className="text-[14px] text-zinc-700 font-bold my-1 ml-4">↓</div>
+                                        <div className="text-3xl font-black text-sky-500 tracking-tighter">{results.final_no2} <span className="text-xs">ppb</span></div>
+                                    </div>
+                                </div>
+                                <div className="flex-1 w-full min-h-[250px] pt-4">
+                                    <canvas id="decayChart"></canvas>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="flex-1 flex flex-col items-center justify-center text-zinc-800 uppercase italic text-sm border border-dashed border-zinc-900 rounded-xl">
+                                System_Idle: Awaiting_Initiation
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
