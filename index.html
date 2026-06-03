@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PM10 Benchmark GUI</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #0a0a0a; --panel: #0f0f0f; --panel2: #111;
+  --border: #00ff41; --border-dim: #004d14; --border-faint: #001f08;
+  --text: #00ff41; --text-dim: #007a20; --text-muted: #003d10;
+  --accent: #00bfff; --accent-dim: #004d66;
+  --warn: #ff8800; --danger: #ff3030; --purple: #cc44ff;
+}
+body { background: var(--bg); color: var(--text); font-family: 'Courier New', monospace; font-size: 13px; overflow: hidden; height: 100vh; }
+
+.screen { display: none; flex-direction: column; height: 100vh; }
+.screen.active { display: flex; }
+
+.hdr {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 9px 16px; border-bottom: 1px solid var(--border-dim);
+  flex-shrink: 0; background: var(--panel);
+}
+.hdr-title { font-size: 11px; letter-spacing: 3px; text-transform: uppercase; }
+.hdr-right { display: flex; align-items: center; gap: 14px; font-size: 10px; color: var(--text-dim); }
+.pill {
+  padding: 2px 8px; border: 1px solid; font-size: 10px; letter-spacing: 1px;
+  border-radius: 2px;
+}
+.pill-live { border-color: var(--border); color: var(--border); }
+.pill-def  { border-color: var(--text-dim); color: var(--text-dim); }
+.pill-err  { border-color: var(--danger); color: var(--danger); }
+.blink { animation: blink 1s step-end infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+
+.body { flex: 1; display: flex; flex-direction: column; padding: 10px; gap: 8px; overflow: hidden; min-height: 0; }
+
+.panel { border: 1px solid var(--border-dim); background: var(--panel); display: flex; flex-direction: column; overflow: hidden; }
+.panel-lbl { font-size: 10px; letter-spacing: 2px; color: var(--text-dim); padding: 5px 10px; border-bottom: 1px solid var(--border-dim); flex-shrink: 0; }
+
+#console-out {
+  padding: 7px 10px; overflow-y: auto; flex: 1;
+  font-size: 11.5px; max-height: 160px; min-height: 80px;
+}
+.ll { margin-bottom: 1px; }
+.ll-info    { color: var(--text-dim); }
+.ll-success { color: var(--border); }
+.ll-warn    { color: var(--warn); }
+.ll-head    { color: var(--text); }
+.ll-error   { color: var(--danger); }
+
+.prog-wrap { height: 2px; background: var(--border-dim); margin: 0 10px; display: none; flex-shrink: 0; }
+.prog-fill { height: 100%; background: var(--border); width: 0%; transition: width 0.3s; }
+
+#tbl-wrap { overflow: auto; flex: 1; padding: 4px; }
+table { width: 100%; border-collapse: collapse; font-size: 11px; }
+th { color: var(--text-dim); text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--border-dim); font-weight: normal; letter-spacing: 1px; white-space: nowrap; }
+td { padding: 3px 8px; border-bottom: 1px solid var(--border-faint); white-space: nowrap; }
+tr:hover td { background: #0d0d0d; }
+.c-mpc { color: #00ff41; } .c-pid { color: #00bfff; } .c-ppo { color: var(--warn); } .c-thr { color: var(--purple); }
+.v-bad { color: var(--danger); } .v-ok { color: var(--warn); } .v-good { color: var(--border); }
+
+.ftr { padding: 9px 10px; border-top: 1px solid var(--border-dim); display: flex; gap: 8px; align-items: center; flex-shrink: 0; background: var(--panel); }
+.btn {
+  background: transparent; border: 1px solid var(--border); color: var(--text);
+  padding: 6px 16px; font-family: 'Courier New', monospace; font-size: 10px;
+  letter-spacing: 2px; cursor: pointer; text-transform: uppercase; transition: background 0.12s;
+}
+.btn:hover:not(:disabled) { background: #001a07; }
+.btn:disabled { opacity: 0.35; cursor: default; }
+.btn-accent { border-color: var(--accent); color: var(--accent); }
+.btn-accent:hover:not(:disabled) { background: #00111a; }
+.btn-run { border-color: var(--warn); color: var(--warn); }
+.btn-run:hover:not(:disabled) { background: #1a0800; }
+.btn-sm { padding: 4px 10px; font-size: 10px; letter-spacing: 1px; }
+
+#sensor-bar {
+  display: flex; gap: 16px; padding: 6px 10px; align-items: center;
+  border-bottom: 1px solid var(--border-dim); font-size: 11px; flex-shrink: 0;
+}
+.sb-key { color: var(--text-dim); }
+.sb-val { color: var(--text); font-weight: bold; }
+
+#sim-controls {
+  display: flex; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--border-dim);
+  flex-wrap: wrap; align-items: center; flex-shrink: 0;
+}
+.sim-lbl { font-size: 10px; color: var(--text-dim); letter-spacing: 1px; }
+select {
+  background: var(--panel2); border: 1px solid var(--border-dim); color: var(--text);
+  font-family: 'Courier New', monospace; font-size: 11px; padding: 4px 8px;
+}
+select:focus { outline: none; border-color: var(--border); }
+
+#sim-stats {
+  display: flex; gap: 16px; padding: 6px 12px; border-bottom: 1px solid var(--border-dim);
+  flex-shrink: 0; flex-wrap: wrap; align-items: center;
+}
+.st-k { font-size: 10px; color: var(--text-dim); }
+.st-v { font-size: 13px; font-weight: bold; }
+.st-v.red { color: var(--danger); } .st-v.orange { color: var(--warn); }
+
+#canvas-wrap { flex: 1; position: relative; overflow: hidden; min-height: 240px; }
+#sim-canvas { width: 100%; height: 100%; display: block; }
+#overlay-tl { position: absolute; top: 8px; left: 12px; font-size: 10px; color: var(--text-dim); pointer-events: none; letter-spacing: 1px; }
+#scrub-ind {
+  position: absolute; bottom: 10px; right: 10px;
+  border: 1px solid var(--border-dim); background: var(--panel);
+  padding: 5px 10px; font-size: 10px; letter-spacing: 1px; pointer-events: none;
+}
+.sdot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 5px; background: var(--accent-dim); }
+.sdot.on { background: var(--accent); }
+
+#timeline {
+  height: 22px; background: var(--panel); border-top: 1px solid var(--border-dim);
+  position: relative; cursor: pointer; flex-shrink: 0;
+}
+#tl-fill { height: 100%; background: var(--border-faint); width: 0%; pointer-events: none; }
+#tl-cur { position: absolute; top: 0; left: 0; width: 2px; height: 100%; background: var(--border); pointer-events: none; }
+#tl-lbl { position: absolute; top: 50%; right: 8px; transform: translateY(-50%); font-size: 10px; color: var(--text-dim); pointer-events: none; }
+
+#sim-ftr {
+  display: flex; gap: 8px; padding: 8px 12px; border-top: 1px solid var(--border-dim);
+  align-items: center; flex-shrink: 0; background: var(--panel);
+}
+#ftr-status { font-size: 10px; color: var(--text-dim); margin-left: auto; letter-spacing: 1px; }
+
+#loading-overlay {
+  position: fixed; inset: 0; background: #0a0a0aee;
+  display: none; align-items: center; justify-content: center;
+  flex-direction: column; gap: 12px; z-index: 99;
+}
+#loading-overlay.show { display: flex; }
+.spin {
+  width: 28px; height: 28px; border: 2px solid var(--border-dim);
+  border-top-color: var(--border); border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+#loading-msg { font-size: 11px; color: var(--text-dim); letter-spacing: 2px; }
+
+#toast {
+  position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
+  background: #1a0000; border: 1px solid var(--danger); color: var(--danger);
+  padding: 8px 20px; font-size: 11px; letter-spacing: 1px; display: none; z-index: 100;
+}
+</style>
+</head>
+<body>
+
+<div id="loading-overlay">
+  <div class="spin"></div>
+  <div id="loading-msg">RUNNING BENCHMARK...</div>
+</div>
+<div id="toast"></div>
+
+<div class="screen active" id="screen-main">
+  <div class="hdr">
+    <span class="hdr-title">PM10 Benchmark Controller</span>
+    <div class="hdr-right">
+      <span id="sensor-pill" class="pill pill-def">SENSOR: --</span>
+      <span id="hdr-status" class="blink">■ READY</span>
+    </div>
+  </div>
+
+  <div id="sensor-bar">
+    <span class="sb-key">BAPUJI NAGAR PM10</span>
+    <span class="sb-val" id="sb-pm10">--</span>
+    <span class="sb-key">µg/m³</span>
+    <span class="sb-key" id="sb-source" style="margin-left:8px"></span>
+    <button class="btn btn-sm" style="margin-left:auto" onclick="fetchSensor()">↺ REFRESH SENSOR</button>
+  </div>
+
+  <div class="body">
+    <div class="panel" style="flex:0 0 auto">
+      <div class="panel-lbl">▸ CONSOLE LOG</div>
+      <div id="console-out"><div class="ll ll-info">[ PRESS RUN BENCHMARK TO START ]</div></div>
+    </div>
+
+    <div class="prog-wrap" id="prog-wrap"><div class="prog-fill" id="prog-fill"></div></div>
+
+    <div class="panel" style="flex:1; min-height:0">
+      <div class="panel-lbl">▸ BENCHMARK RESULTS — AGGREGATED (N=5 SEEDS)</div>
+      <div id="tbl-wrap">
+        <div style="padding:20px; text-align:center; color:var(--text-muted); font-size:11px; letter-spacing:2px;">[ RUN BENCHMARK TO POPULATE TABLE ]</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ftr">
+    <button class="btn btn-run" id="run-btn" onclick="runBenchmark()">▶ RUN BENCHMARK</button>
+    <button class="btn btn-accent" id="view-btn" onclick="showSim()" disabled>VIEW SIMULATIONS ▸</button>
+  </div>
+</div>
+
+<div class="screen" id="screen-sim">
+  <div class="hdr">
+    <button class="btn btn-sm" onclick="showMain()">◂ BACK</button>
+    <span class="hdr-title">Simulation Viewer</span>
+    <span id="sim-badge" class="pill" style="border-color:var(--border); color:var(--border)">MPC</span>
+  </div>
+
+  <div id="sim-controls">
+    <span class="sim-lbl">SCENARIO</span>
+    <select id="sel-sc" onchange="loadSim()">
+      <option>Normal Traffic</option><option>Traffic Spike</option>
+      <option>Pollution Burst</option><option>Windy Conditions</option><option>Low Water</option>
+    </select>
+    <span class="sim-lbl">CONTROLLER</span>
+    <select id="sel-ct" onchange="loadSim()">
+      <option>MPC</option><option>PID</option><option>PPO</option><option>Threshold</option>
+    </select>
+    <span class="sim-lbl">SEED</span>
+    <select id="sel-sd" onchange="loadSim()">
+      <option>42</option><option>1024</option><option>2026</option><option>777</option><option>1337</option>
+    </select>
+    <span class="sim-lbl">SPEED</span>
+    <select id="sel-sp"><option value="1">1×</option><option value="3" selected>3×</option><option value="6">6×</option></select>
+  </div>
+
+  <div id="sim-stats">
+    <div><span class="st-k">PM10 </span><span class="st-v" id="st-pm">--</span><span class="st-k"> µg/m³</span></div>
+    <div><span class="st-k">INFLOW </span><span class="st-v" id="st-inf">--</span><span class="st-k"> µg/m³·min⁻¹</span></div>
+    <div><span class="st-k">TARGET </span><span class="st-v">50</span><span class="st-k"> µg/m³</span></div>
+    <div><span class="st-k">LIMIT </span><span class="st-v red">100</span><span class="st-k"> µg/m³</span></div>
+    <div><span class="st-k">ACTION </span><span class="st-v" id="st-act">--</span><span class="st-k">%</span></div>
+    <div><span class="st-k">VIOLATIONS </span><span class="st-v orange" id="st-vio">0.0</span></div>
+    <div><span class="st-k">T </span><span class="st-v" id="st-t">0</span><span class="st-k">/60 min</span></div>
+  </div>
+
+  <div style="flex:1; display:flex; flex-direction:column; overflow:hidden; min-height:0">
+    <div id="canvas-wrap">
+      <canvas id="sim-canvas"></canvas>
+      <div id="overlay-tl">PM10 PARTICLE FIELD — REAL SIMULATION DATA</div>
+      <div id="scrub-ind"><span class="sdot" id="sdot"></span><span id="slbl">SCRUBBER OFF</span></div>
+    </div>
+    <div id="timeline" onclick="seekTL(event)">
+      <div id="tl-fill"></div>
+      <div id="tl-cur"></div>
+      <div id="tl-lbl">T=0</div>
+    </div>
+  </div>
+
+  <div id="sim-ftr">
+    <button class="btn" id="play-btn" onclick="togglePlay()">▶ PLAY</button>
+    <button class="btn btn-sm" onclick="reloadSim()">↺ RESET</button>
+    <span id="ftr-status">PAUSED AT T=0</span>
+  </div>
+</div>
+
+<script>
+const API = "http://localhost:5000";
+const CTRL_COLORS = { MPC:"#00ff41", PID:"#00bfff", PPO:"#ff8800", Threshold:"#cc44ff" };
+const STEPS = 60;
+
+let benchmarkData = null;
+let simData = null;
+let simT = 0, animId = null, playing = false, lastTs = 0;
+let particles = [];
+let sensorPM10 = 45.0;
+
+function toast(msg, dur=3500) {
+  const el = document.getElementById("toast");
+  el.textContent = msg; el.style.display = "block";
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.style.display = "none", dur);
+}
+
+function setLoading(show, msg="RUNNING...") {
+  const el = document.getElementById("loading-overlay");
+  document.getElementById("loading-msg").textContent = msg;
+  el.classList.toggle("show", show);
+}
+
+function log(type, msg) {
+  const out = document.getElementById("console-out");
+  const d = document.createElement("div");
+  d.className = "ll ll-" + type;
+  d.textContent = msg;
+  out.appendChild(d);
+  out.scrollTop = out.scrollHeight;
+}
+
+function clearLog() { document.getElementById("console-out").innerHTML = ""; }
+
+async function fetchSensor() {
+  document.getElementById("sb-pm10").textContent = "...";
+  document.getElementById("sb-source").textContent = "";
+  try {
+    const res = await fetch(API + "/api/sensor");
+    const data = await res.json();
+    sensorPM10 = data.pm10;
+    document.getElementById("sb-pm10").textContent = data.pm10.toFixed(1);
+    document.getElementById("sb-source").textContent = data.source === "live"
+      ? "[ LIVE — Bapuji Nagar ]" : "[ FALLBACK — default ]";
+    const pill = document.getElementById("sensor-pill");
+    if(data.source === "live") {
+      pill.textContent = "SENSOR: LIVE"; pill.className = "pill pill-live";
+    } else {
+      pill.textContent = "SENSOR: DEFAULT"; pill.className = "pill pill-def";
+    }
+    if(data.error) document.getElementById("sb-source").textContent += "  (API error)";
+  } catch(e) {
+    document.getElementById("sb-pm10").textContent = "45.0";
+    document.getElementById("sb-source").textContent = "[ SERVER OFFLINE ]";
+    document.getElementById("sensor-pill").className = "pill pill-err";
+    document.getElementById("sensor-pill").textContent = "SENSOR: ERR";
+  }
+}
+
+async function runBenchmark() {
+  const btn = document.getElementById("run-btn");
+  btn.disabled = true; btn.textContent = "⏳ RUNNING...";
+  document.getElementById("view-btn").disabled = true;
+  document.getElementById("hdr-status").textContent = "■ RUNNING";
+  document.getElementById("prog-wrap").style.display = "block";
+  document.getElementById("prog-fill").style.width = "5%";
+  clearLog();
+
+  try {
+    // fake progress bar while waiting
+    let fake = 5;
+    const progTimer = setInterval(() => {
+      fake = Math.min(fake + 2, 88);
+      document.getElementById("prog-fill").style.width = fake + "%";
+    }, 300);
+
+    const res = await fetch(API + "/api/run_benchmark", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        seeds: [42, 1024, 2026, 777, 1337],
+        steps: 60,
+        initial_pm10: sensorPM10
+      })
+    });
+
+    clearInterval(progTimer);
+    document.getElementById("prog-fill").style.width = "100%";
+
+    const data = await res.json();
+
+    if(!data.ok) {
+      log("error", "[ERROR] " + data.error);
+      if(data.trace) console.error(data.trace);
+      toast("Benchmark failed — check console");
+      document.getElementById("hdr-status").textContent = "■ ERROR";
+      return;
+    }
+
+    // play back server logs
+    for(const l of data.log) log(l.type, l.msg);
+
+    benchmarkData = data;
+    renderTable(data.aggregated);
+
+    document.getElementById("view-btn").disabled = false;
+    document.getElementById("hdr-status").textContent = "■ COMPLETE";
+    document.getElementById("hdr-status").classList.remove("blink");
+
+  } catch(e) {
+    log("error", "[ERROR] Cannot reach Flask server. Is app.py running?");
+    log("error", "        Run: python app.py   then refresh.");
+    toast("Cannot reach server — run: python app.py");
+    document.getElementById("hdr-status").textContent = "■ OFFLINE";
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "▶ RUN AGAIN";
+    setTimeout(() => document.getElementById("prog-wrap").style.display = "none", 800);
+  }
+}
+
+function renderTable(agg) {
+  const scenarios = Object.keys(agg);
+  const ctrls = ["MPC","PID","PPO","Threshold"];
+  const cls = { MPC:"c-mpc", PID:"c-pid", PPO:"c-ppo", Threshold:"c-thr" };
+
+  let html = `<table><thead><tr>
+    <th>SCENARIO</th><th>CTRL</th><th>AVG PM10</th><th>±STD</th>
+    <th>RMSE</th><th>WATER(k)</th><th>VIOLATIONS</th>
+  </tr></thead><tbody>`;
+
+  for(const sc of scenarios) {
+    for(const c of ctrls) {
+      const d = agg[sc][c];
+      const pm = d["Average PM10"].mean;
+      const rmse = d["RMSE"].mean;
+      const water = d["Water Usage"].mean / 1000;
+      const viol = d["Total Violations"].mean;
+      const std = d["Average PM10"].std;
+
+      const pmC = pm > 80 ? "v-bad" : pm > 65 ? "v-ok" : "v-good";
+      const viC = viol > 200 ? "v-bad" : viol > 0 ? "v-ok" : "v-good";
+
+      html += `<tr>
+        <td>${sc}</td>
+        <td class="${cls[c]}">${c}</td>
+        <td class="${pmC}">${pm.toFixed(2)}</td>
+        <td style="color:var(--text-dim)">±${std.toFixed(2)}</td>
+        <td>${rmse.toFixed(2)}</td>
+        <td>${water.toFixed(1)}</td>
+        <td class="${viC}">${viol.toFixed(2)}</td>
+      </tr>`;
+    }
+  }
+
+  html += "</tbody></table>";
+  document.getElementById("tbl-wrap").innerHTML = html;
+}
+
+function showSim() {
+  document.getElementById("screen-main").classList.remove("active");
+  document.getElementById("screen-sim").classList.add("active");
+  loadSim();
+}
+
+function showMain() {
+  cancelAnim();
+  document.getElementById("screen-sim").classList.remove("active");
+  document.getElementById("screen-main").classList.add("active");
+}
+
+async function loadSim() {
+  cancelAnim(); playing = false;
+  document.getElementById("play-btn").textContent = "▶ PLAY";
+
+  const sc  = document.getElementById("sel-sc").value;
+  const ct  = document.getElementById("sel-ct").value;
+  const sd  = document.getElementById("sel-sd").value;
+
+  document.getElementById("sim-badge").textContent = ct;
+  document.getElementById("sim-badge").style.borderColor = CTRL_COLORS[ct];
+  document.getElementById("sim-badge").style.color = CTRL_COLORS[ct];
+  document.getElementById("ftr-status").textContent = "LOADING...";
+
+  // check if we already have this data cached
+  if(benchmarkData && benchmarkData.raw) {
+    const entry = benchmarkData.raw[sc]?.[ct]?.find(r => r.seed === parseInt(sd));
+    if(entry) {
+      simData = entry.trajectory;
+      simT = 0;
+      initParticles(simData.pm10[0]);
+      renderFrame(0);
+      document.getElementById("ftr-status").textContent = `PAUSED AT T=0  [cached]`;
+      return;
+    }
+  }
+
+  setLoading(true, "FETCHING TRAJECTORY...");
+  try {
+    const res = await fetch(API + "/api/simulate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ scenario: sc, controller: ct, seed: parseInt(sd), steps: STEPS, initial_pm10: sensorPM10 })
+    });
+    const data = await res.json();
+    if(!data.ok) { toast("Simulation error: " + data.error); return; }
+    simData = data.trajectory;
+    simT = 0;
+    initParticles(simData.pm10[0]);
+    renderFrame(0);
+    document.getElementById("ftr-status").textContent = "PAUSED AT T=0";
+  } catch(e) {
+    toast("Cannot reach server");
+    document.getElementById("ftr-status").textContent = "SERVER OFFLINE";
+  } finally {
+    setLoading(false);
+  }
+}
+
+function reloadSim() { loadSim(); }
+
+function seeded(n) {
+  let s = n;
+  return () => { s = (s*1664525+1013904223)&0xffffffff; return (s>>>0)/4294967296; };
+}
+
+function initParticles(initPm) {
+  const c = document.getElementById("sim-canvas");
+  const w = c.offsetWidth||600, h = c.offsetHeight||260;
+  const rng = seeded(1234);
+  const count = Math.round(initPm * 0.75);
+  const yBottom = h - (15  / 160) * h;
+  const yTop    = h - (initPm / 160) * h;
+  const zoneH   = Math.max(4, yBottom - yTop);
+  particles = [];
+  for(let i=0;i<count;i++) {
+    particles.push({
+      x: rng()*w,
+      y: yTop + rng()*zoneH,
+      vx:(rng()-0.5)*0.5, vy:(rng()-0.5)*0.4,
+      r:1.5+rng()*2.5, a:0.4+rng()*0.5
+    });
+  }
+}
+
+function renderFrame(t) {
+  if(!simData) return;
+  const canvas = document.getElementById("sim-canvas");
+  const w = canvas.offsetWidth||600, h = canvas.offsetHeight||260;
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  ctx.clearRect(0,0,w,h);
+
+  const pm     = simData.pm10[t];
+  const action = t < simData.actions.length ? simData.actions[t] : 0;
+  const inflow = t < simData.inflows.length ? simData.inflows[t] : 0;
+
+  const ctrl  = document.getElementById("sel-ct").value;
+  const color = CTRL_COLORS[ctrl];
+
+  const drawHLine = (val, col, dash, label) => {
+    const y = h - (val/160)*h;
+    ctx.save(); ctx.strokeStyle = col; ctx.lineWidth = 1;
+    ctx.setLineDash(dash); ctx.globalAlpha = 0.4;
+    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(w,y); ctx.stroke();
+    ctx.setLineDash([]); ctx.globalAlpha = 0.55;
+    ctx.fillStyle = col; ctx.font = "9px Courier New";
+    ctx.fillText(label, 4, y-3); ctx.restore();
+  };
+  
+  // draw guidelines
+  drawHLine(50,  "#00ff41", [4,4], "TARGET 50 µg/m³");
+  drawHLine(100, "#ff3030", [2,4], "LIMIT 100 µg/m³");
+
+  // draw water spray
+  const scrubOn = action > 5;
+  if(scrubOn) {
+    const drops = Math.floor(action/8);
+    ctx.fillStyle = "#00bfff";
+    const rng2 = seeded(t*97+3);
+    for(let i=0;i<drops*4;i++) {
+      ctx.globalAlpha = 0.15 + rng2()*0.25;
+      ctx.beginPath();
+      ctx.arc(rng2()*w, rng2()*h, 1.5, 0, Math.PI*2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // keep particles inside the valid zone
+  // canvas y is upside down so higher pm means lower y
+  const pmFloor = 15;
+  const yBottom = h - (pmFloor / 160) * h;
+  const yTop    = h - (pm / 160) * h;
+  const zoneH   = Math.max(4, yBottom - yTop);
+
+  const target = Math.round(pm * 0.75);
+  while(particles.length < target) {
+    const rng3 = seeded(particles.length*31+t);
+    const py = yTop + rng3() * zoneH;
+    particles.push({ x:rng3()*w, y:py, vx:(rng3()-0.5)*0.5, vy:(rng3()-0.5)*0.4, r:1.5+rng3()*2.5, a:0.4+rng3()*0.5 });
+  }
+  while(particles.length > target) particles.pop();
+
+  const col = pm>100 ? "#ff3030" : pm>75 ? "#ff8800" : color;
+  for(const p of particles) {
+    p.x += p.vx;
+    p.y += p.vy;
+    
+    // screen wrap x
+    if(p.x < 0) p.x = w;
+    if(p.x > w) p.x = 0;
+    
+    // bounce off floor and ceiling
+    if(p.y < yTop)    { p.y = yTop;    p.vy *= -1; }
+    if(p.y > yBottom) { p.y = yBottom; p.vy *= -1; }
+    
+    ctx.globalAlpha = p.a;
+    ctx.fillStyle = col;
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI*2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  // right side pm indicator
+  const barH = Math.min((pm/160)*h, h);
+  const barCol = pm>100?"#ff303022":pm>50?"#ff880022":"#00ff4115";
+  ctx.fillStyle = barCol;
+  ctx.fillRect(w-18, h-barH, 14, barH);
+  ctx.strokeStyle = pm>100?"#ff3030":pm>50?"#ff8800":"#00ff41";
+  ctx.lineWidth = 1; ctx.globalAlpha = 0.7;
+  ctx.strokeRect(w-18, h-barH, 14, barH);
+  ctx.globalAlpha = 1;
+
+  document.getElementById("st-pm").textContent  = pm.toFixed(1);
+  document.getElementById("st-pm").className = "st-v" + (pm>100?" red":pm>70?" orange":"");
+  document.getElementById("st-act").textContent  = action.toFixed(0);
+  document.getElementById("st-inf").textContent  = inflow.toFixed(1);
+  document.getElementById("st-t").textContent    = t;
+
+  // tally violations
+  const cumViol = (simData.pm10.slice(0,t+1).reduce((s,v)=>s+Math.max(0,v-100),0)).toFixed(1);
+  document.getElementById("st-vio").textContent = cumViol;
+
+  document.getElementById("sdot").className = "sdot" + (scrubOn?" on":"");
+  document.getElementById("slbl").textContent = scrubOn ? `SCRUBBER ON  ${action.toFixed(0)}%` : "SCRUBBER OFF";
+
+  const pct = (t/STEPS)*100;
+  document.getElementById("tl-fill").style.width  = pct + "%";
+  document.getElementById("tl-cur").style.left    = pct + "%";
+  document.getElementById("tl-lbl").textContent   = `T=${t} min`;
+}
+
+function togglePlay() {
+  if(playing) {
+    playing = false; cancelAnim();
+    document.getElementById("play-btn").textContent = "▶ PLAY";
+    document.getElementById("ftr-status").textContent = `PAUSED AT T=${simT}`;
+  } else {
+    if(simT >= STEPS) { simT = 0; initParticles(simData.pm10[0]); }
+    playing = true;
+    document.getElementById("play-btn").textContent = "⏸ PAUSE";
+    lastTs = 0; animId = requestAnimationFrame(animate);
+  }
+}
+
+function animate(ts) {
+  if(!playing) return;
+  const speed  = parseInt(document.getElementById("sel-sp").value);
+  const interval = 200 / speed;
+  if(ts - lastTs > interval) {
+    lastTs = ts;
+    if(simT < STEPS) { renderFrame(simT); simT++; }
+    else {
+      playing = false;
+      document.getElementById("play-btn").textContent = "▶ PLAY";
+      document.getElementById("ftr-status").textContent = "SIMULATION COMPLETE";
+      return;
+    }
+  }
+  document.getElementById("ftr-status").textContent = `PLAYING  T=${simT}/60`;
+  animId = requestAnimationFrame(animate);
+}
+
+function cancelAnim() {
+  if(animId) { cancelAnimationFrame(animId); animId = null; }
+}
+
+function seekTL(e) {
+  const bar = document.getElementById("timeline");
+  const rect = bar.getBoundingClientRect();
+  const pct = Math.max(0, Math.min(1, (e.clientX-rect.left)/rect.width));
+  simT = Math.min(Math.round(pct*STEPS), STEPS-1);
+  renderFrame(simT);
+  if(!playing) document.getElementById("ftr-status").textContent = `PAUSED AT T=${simT}`;
+}
+
+fetchSensor();
+</script>
+</body>
+</html>
