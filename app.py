@@ -243,13 +243,13 @@ def index():
 if __name__ == "__main__":
     get_forecaster()   # load at startup, not on first request
     print("\n" + "=" * 50)
-    print("  Open http://localhost:5000 in your browser")
+    print("  Open http://localhost:5001 in your browser")
     print("=" * 50 + "\n")
     try:
         from waitress import serve
         print("[Server] Using waitress")
-        serve(app, host="127.0.0.1", port=5000, threads=4, channel_timeout=300)
+        serve(app, host="127.0.0.1", port=5001, threads=4, channel_timeout=300)
     except ImportError:
         print("[Server] waitress not found — run: pip install waitress")
         print("[Server] Falling back to Flask dev server")
-        app.run(host="127.0.0.1", port=5000, debug=False, threaded=True)
+        app.run(host="127.0.0.1", port=5001, debug=False, threaded=True)
