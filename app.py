@@ -69,6 +69,8 @@ def api_sensor():
             api_key=sim_cfg.openaq_api_key,
             location_id=sim_cfg.bapuji_nagar_id
         )
+        if env_cfg.initial_pm10 <= 0.1:
+            raise ValueError("Sensor reported 0.0 (offline)")
         default = EnvironmentConfig().initial_pm10
         is_live = env_cfg.initial_pm10 != default
         return jsonify({
